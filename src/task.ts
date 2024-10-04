@@ -1,4 +1,4 @@
-import { getCategories } from "./mockedApi";
+import { getCategories } from './mockedApi';
 
 export interface CategoryListElement {
   name: string;
@@ -10,7 +10,6 @@ export interface CategoryListElement {
 }
 
 export const categoryTree = async (): Promise<CategoryListElement[]> => {
-
   const res = await getCategories();
 
   if (!res.data) {
@@ -19,10 +18,10 @@ export const categoryTree = async (): Promise<CategoryListElement[]> => {
 
   const toShowOnHome: number[] = [];
 
-  let result = res.data.map((c1) => {
+  const result = res.data.map((c1) => {
     let order = c1.Title;
-    if (c1.Title && c1.Title.includes("#")) {
-      order = c1.Title.split("#")[0];
+    if (c1.Title && c1.Title.includes('#')) {
+      order = c1.Title.split('#')[0];
       toShowOnHome.push(c1.id);
     }
 
@@ -30,21 +29,21 @@ export const categoryTree = async (): Promise<CategoryListElement[]> => {
     if (isNaN(orderL1)) {
       orderL1 = c1.id;
     }
-    let l2Kids = c1.children
+    const l2Kids = c1.children
       ? c1.children.map((c2) => {
           let order2 = c1.Title;
-          if (c2.Title && c2.Title.includes("#")) {
-            order2 = c2.Title.split("#")[0];
+          if (c2.Title && c2.Title.includes('#')) {
+            order2 = c2.Title.split('#')[0];
           }
           let orderL2 = parseInt(order2);
           if (isNaN(orderL2)) {
             orderL2 = c2.id;
           }
-          let l3Kids = c2.children
+          const l3Kids = c2.children
             ? c2.children.map((c3) => {
                 let order3 = c1.Title;
-                if (c3.Title && c3.Title.includes("#")) {
-                  order3 = c3.Title.split("#")[0];
+                if (c3.Title && c3.Title.includes('#')) {
+                  order3 = c3.Title.split('#')[0];
                 }
                 let orderL3 = parseInt(order3);
                 if (isNaN(orderL3)) {
