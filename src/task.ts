@@ -1,4 +1,4 @@
-import { getCategories } from './mockedApi';
+import { Category } from './mockedApi';
 
 export interface CategoryListElement {
   name: string;
@@ -9,87 +9,92 @@ export interface CategoryListElement {
   showOnHome: boolean;
 }
 
-export const categoryTree = async (): Promise<CategoryListElement[]> => {
-  const res = await getCategories();
+type GetCategoriesFunc = () => Promise<{
+  data: Category[];
+}>;
 
-  if (!res.data) {
+const ORDER_SEPARATOR = '#';
+const MAX_CATEGORIES_ON_HOME = 5;
+const MIN_CATEGORIES_ON_HOME = 3;
+
+const tryGetData = async (
+  getCategoriesFunc: GetCategoriesFunc
+): Promise<Category[]> => {
+  try {
+    const response = await getCategoriesFunc();
+
+    return response.data;
+  } catch (e) {
+    // log error
     return [];
   }
+};
 
-  const toShowOnHome: number[] = [];
+const sortCategories = (
+  categories: CategoryListElement[]
+): CategoryListElement[] => categories.sort((a, b) => a.order - b.order);
 
-  const result = res.data.map((c1) => {
-    let order = c1.Title;
-    if (c1.Title && c1.Title.includes('#')) {
-      order = c1.Title.split('#')[0];
-      toShowOnHome.push(c1.id);
-    }
+const getOrder = (category: Category): number => {
+  const order = category.Title;
 
-    let orderL1 = parseInt(order);
-    if (isNaN(orderL1)) {
-      orderL1 = c1.id;
-    }
-    const l2Kids = c1.children
-      ? c1.children.map((c2) => {
-          let order2 = c1.Title;
-          if (c2.Title && c2.Title.includes('#')) {
-            order2 = c2.Title.split('#')[0];
-          }
-          let orderL2 = parseInt(order2);
-          if (isNaN(orderL2)) {
-            orderL2 = c2.id;
-          }
-          const l3Kids = c2.children
-            ? c2.children.map((c3) => {
-                let order3 = c1.Title;
-                if (c3.Title && c3.Title.includes('#')) {
-                  order3 = c3.Title.split('#')[0];
-                }
-                let orderL3 = parseInt(order3);
-                if (isNaN(orderL3)) {
-                  orderL3 = c3.id;
-                }
-                return {
-                  id: c3.id,
-                  image: c3.MetaTagDescription,
-                  name: c3.name,
-                  order: orderL3,
-                  children: [],
-                  showOnHome: false,
-                };
-              })
-            : [];
-          l3Kids.sort((a, b) => a.order - b.order);
-          return {
-            id: c2.id,
-            image: c2.MetaTagDescription,
-            name: c2.name,
-            order: orderL2,
-            children: l3Kids,
-            showOnHome: false,
-          };
-        })
-      : [];
-    l2Kids.sort((a, b) => a.order - b.order);
-    return {
-      id: c1.id,
-      image: c1.MetaTagDescription,
-      name: c1.name,
-      order: orderL1,
-      children: l2Kids,
-      showOnHome: false,
-    };
-  });
+  if (!order) return category.id;
 
-  result.sort((a, b) => a.order - b.order);
+  const orderParts = order.split(ORDER_SEPARATOR);
+  const orderNumber = parseInt(orderParts[0]);
 
-  if (result.length <= 5) {
-    result.forEach((a) => (a.showOnHome = true));
-  } else if (toShowOnHome.length > 0) {
-    result.forEach((x) => (x.showOnHome = toShowOnHome.includes(x.id)));
-  } else {
-    result.forEach((x, index) => (x.showOnHome = index < 3));
+  if (isNaN(orderNumber)) return category.id;
+
+  return orderNumber;
+};
+
+const mapCategory = (category: Category): CategoryListElement => ({
+  id: category.id,
+  name: category.name,
+  image: category.MetaTagDescription,
+  order: getOrder(category),
+  children: category.children
+    ? sortCategories(category.children.map(mapCategory))
+    : [],
+  showOnHome: false,
+});
+
+// basically not sure what to do with this part. I do not know business logic, so I live it as is with some refactoring:
+const mapToShowOnHome = (
+  categoriesList: CategoryListElement[],
+  data: Category[]
+): CategoryListElement[] => {
+  if (categoriesList.length <= MAX_CATEGORIES_ON_HOME) {
+    return categoriesList.map((category) => ({
+      ...category,
+      showOnHome: true,
+    }));
   }
 
-  return result;
+  const toShowOnHome = data.reduce((acc, category) => {
+    if (category.Title?.includes(ORDER_SEPARATOR)) {
+      acc.add(category.id);
+    }
+    return acc;
+  }, new Set<number>());
+
+  if (toShowOnHome.size > 0) {
+    return categoriesList.map((category) => ({
+      ...category,
+      showOnHome: toShowOnHome.has(category.id),
+    }));
+  }
+
+  return categoriesList.map((category, index) => ({
+    ...category,
+    showOnHome: index < MIN_CATEGORIES_ON_HOME,
+  }));
+};
+
+export const categoryTree = async (
+  getCategoriesFunc: GetCategoriesFunc
+): Promise<CategoryListElement[]> => {
+  const data = await tryGetData(getCategoriesFunc);
+  const categories = sortCategories(data.map(mapCategory));
+
+  return mapToShowOnHome(categories, data);
 };
